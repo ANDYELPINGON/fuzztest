@@ -154,6 +154,7 @@ struct IRObject {
     } else if constexpr (is_variant_v<T>) {
       IRObject obj;
       auto& v = obj.MutableSubs();
+      v.reserve(2);
       v.emplace_back(value.index());
       v.push_back(
           std::visit([](const auto& v) { return FromCorpus(v); }, value));
@@ -167,6 +168,7 @@ struct IRObject {
     } else if constexpr (is_bitvector_v<T>) {
       IRObject obj;
       auto& v = obj.MutableSubs();
+      v.reserve(value.size());
       // Force conversion to bool. The `is_dynamic_container_v` case allows elem
       // to keep the bit iterator type, which IRObject doesn't understand.
       for (bool elem : value) {
@@ -176,6 +178,7 @@ struct IRObject {
     } else if constexpr (is_dynamic_container_v<T>) {
       IRObject obj;
       auto& v = obj.MutableSubs();
+      v.reserve(value.size());
       for (const auto& elem : value) {
         v.push_back(FromCorpus(elem));
       }
@@ -186,6 +189,7 @@ struct IRObject {
           [](const auto&... elem) {
             IRObject obj;
             auto& v = obj.MutableSubs();
+            v.reserve(sizeof...(elem));
             (v.push_back(FromCorpus(elem)), ...);
             return obj;
           },
@@ -262,7 +266,7 @@ struct IRObject {
 
   // Serialize the object as a string. This is used to persist the object on
   // files for reproducing bugs later.
-  std::string ToString() const;
+  std::string ToString(bool binary_format = true) const;
   static std::optional<IRObject> FromString(absl::string_view str);
 
  private:
