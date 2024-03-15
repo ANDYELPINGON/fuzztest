@@ -261,3 +261,10 @@ message DataColumnFilter {
     NotFilter not_filter = 3;
   }
 }
+
+message Vector {
+  repeated uint32 rows = 1 [packed = true];
+}
+message Matrix {
+  repeated Vector columns = 1;
+}

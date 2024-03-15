@@ -28,8 +28,10 @@
 #include "absl/algorithm/container.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
+#include "absl/strings/str_cat.h"
 #include "absl/types/span.h"
 #include "./fuzztest/fuzztest.h"
+#include "./fuzztest/fuzztest_macros.h"
 #include "./fuzztest/internal/test_protobuf.pb.h"
 #include "google/protobuf/text_format.h"
 #include "re2/re2.h"
@@ -39,6 +41,7 @@ namespace {
 using ::fuzztest::internal::CalculatorExpression;
 using ::fuzztest::internal::DataColumnFilter;
 using ::fuzztest::internal::FoodMachineProcedure;
+using ::fuzztest::internal::Matrix;
 using ::fuzztest::internal::MazePath;
 using ::fuzztest::internal::NodeGraph;
 using ::fuzztest::internal::RoboCourier560Plan;
@@ -796,4 +799,93 @@ TEST(ProtoPuzzles, ValidateFiltersNotEmptyReproducer) {
   EXPECT_DEATH(ValidateFiltersNotEmpty(data_column_filter), "SIGABRT");
 }
 
+// Check whether the matrix (> 3x3) is symmetric and does not have 0 elements.
+void IsValidSymmetricMatrix(const Matrix& matrix) {
+  const int size = matrix.columns_size();
+  if (size <= 3) return;  // Not interested in small matrices.
+  for (int i = 0; i < size; ++i) {
+    if (matrix.columns(i).rows_size() != size) return;  // Not a square matrix.
+  }
+  for (int i = 0; i < size; ++i) {
+    if (matrix.columns(i).rows(i) == 0) {
+      // Not valid when has elements 0.
+      return;
+    }
+    for (int j = i + 1; j < size; ++j) {
+      if (matrix.columns(i).rows(j) == 0) {
+        // Not valid when has elements 0.
+        return;
+      }
+      if (matrix.columns(i).rows(j) != matrix.columns(j).rows(i)) {
+        // Not a symmetric matrix.
+        return;
+      }
+    }
+  }
+  std::cout << absl::StrCat("Matrix: ", matrix, "\n");
+  Target();
+}
+FUZZ_TEST(ProtoPuzzles, IsValidSymmetricMatrix);
+
+void isValidMinesweeperBoard(const Matrix& board) {
+  // Check if the board is at least 3x3 in size.
+  const int rows = board.columns_size();
+  if (rows <= 3) return;
+  const int cols = board.columns(0).rows_size();
+  if (cols <= 3) return;
+
+  for (int i = 0; i < rows; ++i) {
+    if (board.columns(i).rows_size() != cols) {
+      // Rows are not the same size.
+      return;
+    }
+  }
+
+  // Check if there is at least one bomb.
+  bool hasBomb = false;
+  for (int i = 0; i < rows; i++) {
+    for (int j = 0; j < cols; j++) {
+      if (board.columns(i).rows(j) == -1) {
+        hasBomb = true;
+        break;
+      }
+    }
+    if (hasBomb) {
+      break;
+    }
+  }
+  if (!hasBomb) {
+    // No bomb in the board.
+    return;
+  }
+
+  // Check if the board is valid.
+  for (int i = 0; i < rows; i++) {
+    for (int j = 0; j < cols; j++) {
+      if (board.columns(i).rows(j) == -1) {
+        continue;
+      }
+
+      // Count the number of bombs around a cell.
+      int count = 0;
+      for (int x = i - 1; x <= i + 1; x++) {
+        for (int y = j - 1; y <= j + 1; y++) {
+          // Make sure we stay within the bounds of the board and check for the
+          // presence of surrounding bombs.
+          if (x >= 0 && x < rows && y >= 0 && y < cols &&
+              board.columns(x).rows(y) == -1) {
+            count++;
+          }
+        }
+      }
+
+      if (board.columns(i).rows(j) != count) {
+        // Incorrect number of bombs surrounding cell.
+        return;
+      }
+    }
+  }
+  Target();
+}
+FUZZ_TEST(ProtoPuzzles, isValidMinesweeperBoard);
 }  // namespace
